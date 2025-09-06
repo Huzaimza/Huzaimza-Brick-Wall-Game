@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Brick Ball Wall Game</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #111;
+      color: white;
+      text-align: center;
+      position: relative;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #222;
+    }
+    #controls {
+      margin-top: 10px;
+    }
+    .btn {
+      font-size: 20px;
+      padding: 10px 20px;
+      margin: 5px;
+      background: #444;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .btn:active {
+      background: #666;
+    }
+    #titleScreen, #gameOverScreen {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.85);
+      padding: 20px;
+      border-radius: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="480" height="320"></canvas>
+
+<div id="controls">
+  <button class="btn" id="leftBtn">Left</button>
+  <button class="btn" id="rightBtn">Right</button>
+</div>
+
+<div id="titleScreen">
+  <h1>Brick Ball Wall Game</h1>
+  <button class="btn" onclick="startGame()">Start Game</button>
+</div>
+
+<div id="gameOverScreen">
+  <h2>Game Over</h2>
+  <button class="btn" onclick="restartGame()">Restart</button>
+  <button class="btn" onclick="goToMainMenu()">Main Menu</button>
+</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let paddleWidth = 80, paddleHeight = 10;
+let paddleX = (canvas.width - paddleWidth) / 2;
+let rightPressed = false, leftPressed = false;
+
+let ballRadius = 8;
+let ballX = canvas.width / 2;
+let ballY = canvas.height - 40;
+let dx = 2, dy = -2;
+
+const brickRowCount = 3, brickColumnCount = 5;
+const brickWidth = 75, brickHeight = 20, brickPadding = 10;
+const brickOffsetTop = 30, brickOffsetLeft = 35;
+let bricks = [];
+
+let isGameOver = false;
+let gameStarted = false;
+
+function initBricks() {
+  bricks = [];
+  for (let c = 0; c < brickColumnCount; c++) {
+    bricks[c] = [];
+    for (let r = 0; r < brickRowCount; r++) {
+      bricks[c][r] = { x: 0, y: 0, status: 1 };
+    }
+  }
+}
+
+initBricks();
+
+// Controls
+document.addEventListener("keydown", e => {
+  if (["ArrowRight", "Right", "d"].includes(e.key)) rightPressed = true;
+  if (["ArrowLeft", "Left", "a"].includes(e.key)) leftPressed = true;
+});
+document.addEventListener("keyup", e => {
+  if (["ArrowRight", "Right", "d"].includes(e.key)) rightPressed = false;
+  if (["ArrowLeft", "Left", "a"].includes(e.key)) leftPressed = false;
+});
+
+// Mouse + Touch support
+["mousedown", "touchstart"].forEach(evt => {
+  document.getElementById("leftBtn").addEventListener(evt, () => leftPressed = true);
+  document.getElementById("rightBtn").addEventListener(evt, () => rightPressed = true);
+});
+["mouseup", "touchend"].forEach(evt => {
+  document.getElementById("leftBtn").addEventListener(evt, () => leftPressed = false);
+  document.getElementById("rightBtn").addEventListener(evt, () => rightPressed = false);
+});
+
+function drawBall() {
+  ctx.beginPath();
+  ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+  ctx.fillStyle = "#f00";
+  ctx.fill();
+  ctx.closePath();
+}
+
+function drawPaddle() {
+  ctx.beginPath();
+  ctx.rect(paddleX, canvas.height - paddleHeight - 10, paddleWidth, paddleHeight);
+  ctx.fillStyle = "#00f";
+  ctx.fill();
+  ctx.closePath();
+}
+
+function drawBricks() {
+  for (let c = 0; c < brickColumnCount; c++) {
+    for (let r = 0; r < brickRowCount; r++) {
+      if (bricks[c][r].status === 1) {
+        let brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+        let brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+        bricks[c][r].x = brickX;
+        bricks[c][r].y = brickY;
+        ctx.beginPath();
+        ctx.rect(brickX, brickY, brickWidth, brickHeight);
+        ctx.fillStyle = "#0f0";
+        ctx.fill();
+        ctx.closePath();
+      }
+    }
+  }
+}
+
+function collisionDetection() {
+  for (let c = 0; c < brickColumnCount; c++) {
+    for (let r = 0; r < brickRowCount; r++) {
+      let b = bricks[c][r];
+      if (b.status === 1) {
+        if (
+          ballX > b.x &&
+          ballX < b.x + brickWidth &&
+          ballY > b.y &&
+          ballY < b.y + brickHeight
+        ) {
+          dy = -dy;
+          b.status = 0;
+        }
+      }
+    }
+  }
+}
+
+function draw() {
+  if (!gameStarted || isGameOver) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBricks();
+  drawBall();
+  drawPaddle();
+  collisionDetection();
+
+  if (ballX + dx > canvas.width - ballRadius || ballX + dx < ballRadius) dx = -dx;
+  if (ballY + dy < ballRadius) dy = -dy;
+  else if (ballY + dy > canvas.height - ballRadius - 10) {
+    if (ballX > paddleX && ballX < paddleX + paddleWidth) {
+      dy = -dy;
+    } else {
+      endGame();
+      return;
+    }
+  }
+
+  ballX += dx;
+  ballY += dy;
+
+  if (rightPressed && paddleX < canvas.width - paddleWidth) paddleX += 5;
+  if (leftPressed && paddleX > 0) paddleX -= 5;
+
+  requestAnimationFrame(draw);
+}
+
+function startGame() {
+  document.getElementById("titleScreen").style.display = "none";
+  gameStarted = true;
+  isGameOver = false;
+  draw();
+}
+
+function endGame() {
+  isGameOver = true;
+  document.getElementById("gameOverScreen").style.display = "block";
+}
+
+function restartGame() {
+  ballX = canvas.width / 2;
+  ballY = canvas.height - 40;
+  dx = 2;
+  dy = -2;
+  paddleX = (canvas.width - paddleWidth) / 2;
+  isGameOver = false;
+  initBricks();
+  document.getElementById("gameOverScreen").style.display = "none";
+  draw();
+}
+
+function goToMainMenu() {
+  isGameOver = false;
+  gameStarted = false;
+  document.getElementById("gameOverScreen").style.display = "none";
+  document.getElementById("titleScreen").style.display = "block";
+}
+
+// Show title screen on load
+document.getElementById("titleScreen").style.display = "block";
+</script>
+
+</body>
+</html>
